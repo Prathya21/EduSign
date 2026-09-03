@@ -13,7 +13,7 @@ async function request(endpoint, options = {}) {
   const headers = { ...options.headers };
   let body = options.body;
 
-  // For FormData, let the browser set the Content-Type header
+  // For FormData, let the browser set Content-Type
   // including the multipart boundary.
   if (body instanceof FormData) {
     delete headers['Content-Type'];
@@ -33,10 +33,13 @@ async function request(endpoint, options = {}) {
   if (!response.ok) {
     const error = await response
       .json()
-      .catch(() => ({ detail: 'Unknown error' }));
+      .catch(() => ({
+        detail: 'Unknown error',
+      }));
 
     throw new ApiError(
-      error.detail || `HTTP ${response.status}`,
+      error.detail ||
+        `HTTP ${response.status}`,
       response.status
     );
   }
@@ -44,50 +47,54 @@ async function request(endpoint, options = {}) {
   return response.json();
 }
 
+
 export const api = {
-  // ==========================================
+
+  // =====================================================
   // HEALTH
-  // ==========================================
+  // =====================================================
 
-  health: () => request('/health'),
+  health: () =>
+    request('/health'),
 
 
-  // ==========================================
-  // ISL DICTIONARY VIDEOS
-  // ==========================================
+  // =====================================================
+  // GET ISL VIDEO FOR A WORD
+  // =====================================================
 
   getVideo: (word) =>
-    request(`/videos/${encodeURIComponent(word)}`),
+    request(
+      `/videos/${encodeURIComponent(word)}`
+    ),
 
 
-  // ==========================================
+  // =====================================================
   // TEXT → ISL
-  // ==========================================
+  // =====================================================
 
   translateTextToIsl: (text) =>
-    request('/translate/text-to-isl', {
-      method: 'POST',
-      body: { text },
-    }),
+    request(
+      '/translate/text-to-isl',
+      {
+        method: 'POST',
+        body: {
+          text,
+        },
+      }
+    ),
 
 
-  // ==========================================
+  // =====================================================
   // SPEECH → TEXT
-  // ==========================================
+  // =====================================================
 
-  /**
-   * Transcribe an audio Blob or File to text using Whisper API.
-   *
-   * @param {Blob|File} audioBlobOrFile
-   * @param {Object} [options]
-   * @param {string} [options.language]
-   * @param {boolean} [options.autoTranslate=false]
-   * @param {string} [options.prompt]
-   * @param {string} [options.filename]
-   */
+  transcribeAudio: (
+    audioBlobOrFile,
+    options = {}
+  ) => {
 
-  transcribeAudio: (audioBlobOrFile, options = {}) => {
-    const formData = new FormData();
+    const formData =
+      new FormData();
 
     const filename =
       options.filename ||
@@ -100,91 +107,106 @@ export const api = {
       filename
     );
 
+
     if (
       options.language &&
       options.language !== 'auto'
     ) {
+
       formData.append(
         'language',
         options.language
       );
+
     }
 
+
     if (
-      options.autoTranslate !== undefined
+      options.autoTranslate !==
+      undefined
     ) {
+
       formData.append(
         'auto_translate',
         options.autoTranslate
       );
+
     }
 
+
     if (options.prompt) {
+
       formData.append(
         'prompt',
         options.prompt
       );
+
     }
 
-    return request('/speech/transcribe', {
-      method: 'POST',
-      body: formData,
-    });
+
+    return request(
+      '/speech/transcribe',
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
   },
 
 
-  // ==========================================
-  // KIE.AI — GENERATE ISL VIDEO
-  // ==========================================
+  // =====================================================
+  // YOUTUBE → SUBTITLES
+  // =====================================================
 
-  /**
-   * Start an AI-generated ISL video.
-   *
-   * This does NOT wait for the video to finish.
-   * Kie.ai returns a task_id which we use to
-   * check the generation status.
-   *
-   * @param {string} text
-   * @returns {Promise<Object>}
-   */
+  getYouTubeSubtitles: (
+    url,
+    language = 'en'
+  ) =>
+    request(
+      '/youtube/subtitles',
+      {
+        method: 'POST',
+
+        body: {
+          url,
+          language,
+        },
+      }
+    ),
+
+
+  // =====================================================
+  // KIE.AI → GENERATE ISL VIDEO
+  // =====================================================
 
   generateISLVideo: (text) =>
-    request('/kie/generate-isl', {
-      method: 'POST',
+    request(
+      '/kie/generate-isl',
+      {
+        method: 'POST',
 
-      body: {
-        text,
+        body: {
+          text,
+          duration: 5,
+          resolution: '720p',
+          ratio: '16:9',
+        },
+      }
+    ),
 
-        // Kie.ai video settings
-        duration: 5,
-        resolution: '720p',
-        ratio: '16:9',
-      },
-    }),
 
-
-  // ==========================================
-  // KIE.AI — CHECK VIDEO STATUS
-  // ==========================================
-
-  /**
-   * Check the status of a Kie.ai video generation task.
-   *
-   * Possible states include:
-   * waiting
-   * queuing
-   * generating
-   * success
-   * fail
-   *
-   * @param {string} taskId
-   * @returns {Promise<Object>}
-   */
+  // =====================================================
+  // KIE.AI → CHECK VIDEO STATUS
+  // =====================================================
 
   getISLVideoStatus: (taskId) =>
     request(
-      `/kie/status/${encodeURIComponent(taskId)}`
+      `/kie/status/${encodeURIComponent(
+        taskId
+      )}`
     ),
+
 };
 
 

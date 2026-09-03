@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api, ApiError } from './services/api';
 import SpeechInput from './components/SpeechInput';
+import YouTubeLearning from './components/YouTubeLearning';
 
 function App() {
   const [activeTab, setActiveTab] = useState('text');
@@ -935,6 +936,7 @@ function App() {
           </section>
 
         </div>
+        <YouTubeLearning />
 
       </div>
 
