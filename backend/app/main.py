@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.api.routes import videos, translation, speech
+from app.api.routes import videos, translation, speech, kie
 
 load_dotenv()
 
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(videos.router)
 app.include_router(translation.router)
 app.include_router(speech.router)
+app.include_router(kie.router)
 
 # Ensure data/videos directory exists and mount static files
 root_dir = Path(__file__).resolve().parent.parent.parent

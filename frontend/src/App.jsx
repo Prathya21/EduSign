@@ -10,19 +10,30 @@ function App() {
   const [error, setError] = useState(null);
   const [lastSource, setLastSource] = useState(null);
 
+  // Kie.ai video generation
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState(null);
+
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // -----------------------------
+  // =========================================================
   // TEXT → ISL
-  // -----------------------------
+  // =========================================================
   const handleTranslate = async (e) => {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+    }
 
-    if (!inputText.trim()) return;
+    if (!inputText.trim()) {
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setLastSource('text');
+
+    // Clear previously generated AI video
+    setGeneratedVideoUrl(null);
 
     try {
       const data = await api.translateTextToIsl(inputText);
@@ -36,7 +47,6 @@ function App() {
       setSelectedVideo(firstFound || null);
 
     } catch (err) {
-
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -54,9 +64,9 @@ function App() {
   };
 
 
-  // -----------------------------
+  // =========================================================
   // SPEECH TRANSCRIPTION
-  // -----------------------------
+  // =========================================================
   const handleSpeechTranscriptionComplete = (data) => {
 
     if (data.text) {
@@ -81,14 +91,179 @@ function App() {
   };
 
 
-  // -----------------------------
+  // =========================================================
   // POPULATE TEXT
-  // -----------------------------
+  // =========================================================
   const handlePopulateText = (text) => {
     setInputText(text);
   };
 
 
+  // =========================================================
+  // KIE.AI → GENERATE ISL VIDEO
+  // =========================================================
+  const handleGenerateISLVideo = async (text) => {
+
+    if (!text || !text.trim()) {
+      setError('Please provide some text first.');
+      return;
+    }
+
+    try {
+
+      setError(null);
+
+      setIsGeneratingVideo(true);
+
+      setGeneratedVideoUrl(null);
+
+      console.log(
+        'Starting Kie.ai video generation...'
+      );
+
+      console.log(
+        'Text:',
+        text
+      );
+
+
+      // -------------------------------------------------------
+      // STEP 1: CREATE KIE.AI TASK
+      // -------------------------------------------------------
+
+      const task =
+        await api.generateISLVideo(text);
+
+      console.log(
+        'Kie.ai task created:',
+        task
+      );
+
+
+      const taskId =
+        task.task_id;
+
+
+      if (!taskId) {
+
+        throw new Error(
+          'Kie.ai did not return a task ID.'
+        );
+
+      }
+
+
+      // -------------------------------------------------------
+      // STEP 2: CHECK TASK STATUS
+      // -------------------------------------------------------
+
+      while (true) {
+
+        // Wait 5 seconds before checking
+        await new Promise(
+          (resolve) =>
+            setTimeout(resolve, 5000)
+        );
+
+
+        const status =
+          await api.getISLVideoStatus(
+            taskId
+          );
+
+
+        console.log(
+          'Kie.ai status:',
+          status
+        );
+
+
+        // -----------------------------------------------------
+        // VIDEO GENERATED SUCCESSFULLY
+        // -----------------------------------------------------
+
+        if (
+          status.state === 'success'
+        ) {
+
+          if (!status.video_url) {
+
+            throw new Error(
+              'Video generation completed, but no video URL was returned.'
+            );
+
+          }
+
+
+          console.log(
+            'Kie.ai video ready:',
+            status.video_url
+          );
+
+
+          // Store URL so React can display the video
+          setGeneratedVideoUrl(
+            status.video_url
+          );
+
+
+          setIsGeneratingVideo(false);
+
+          return;
+        }
+
+
+        // -----------------------------------------------------
+        // VIDEO GENERATION FAILED
+        // -----------------------------------------------------
+
+        if (
+          status.state === 'fail'
+        ) {
+
+          throw new Error(
+            status.fail_message ||
+            'Kie.ai video generation failed.'
+          );
+
+        }
+
+
+        // -----------------------------------------------------
+        // STILL GENERATING
+        // -----------------------------------------------------
+        //
+        // waiting
+        // queuing
+        // generating
+        //
+        // Keep checking.
+        // -----------------------------------------------------
+
+      }
+
+    } catch (err) {
+
+      console.error(
+        'Kie.ai video generation error:',
+        err
+      );
+
+
+      setError(
+        err.message ||
+        'Failed to generate ISL video.'
+      );
+
+
+      setIsGeneratingVideo(false);
+    }
+  };
+
+
+  // =========================================================
+  // SAMPLE PHRASES
+  // =========================================================
   const samplePhrases = [
     'Hello teacher',
     'Please help student',
@@ -97,19 +272,27 @@ function App() {
   ];
 
 
+  // =========================================================
+  // RENDER
+  // =========================================================
   return (
     <div className="container">
 
-      {/* =========================
+      {/* =====================================================
           HEADER
-      ========================== */}
+          ===================================================== */}
+
       <header>
 
         <div className="header-badge">
           ISL Multimodal AI Translation Platform
         </div>
 
-        <h1>EduSign</h1>
+
+        <h1>
+          EduSign
+        </h1>
+
 
         <p>
           Breaking communication barriers through
@@ -117,16 +300,23 @@ function App() {
         </p>
 
 
-        {/* TAB NAVIGATION */}
+        {/* =================================================
+            TAB NAVIGATION
+            ================================================= */}
+
         <div className="tab-navigation">
 
           <button
             type="button"
             id="tab-text"
             className={`tab-btn ${
-              activeTab === 'text' ? 'active' : ''
+              activeTab === 'text'
+                ? 'active'
+                : ''
             }`}
-            onClick={() => setActiveTab('text')}
+            onClick={() =>
+              setActiveTab('text')
+            }
           >
             Text to ISL
           </button>
@@ -136,9 +326,13 @@ function App() {
             type="button"
             id="tab-speech"
             className={`tab-btn ${
-              activeTab === 'speech' ? 'active' : ''
+              activeTab === 'speech'
+                ? 'active'
+                : ''
             }`}
-            onClick={() => setActiveTab('speech')}
+            onClick={() =>
+              setActiveTab('speech')
+            }
           >
             Speech to Text (Whisper AI)
           </button>
@@ -148,34 +342,42 @@ function App() {
       </header>
 
 
-      {/* =========================
+      {/* =====================================================
           MAIN DASHBOARD
-      ========================== */}
+          ===================================================== */}
+
       <div className="dashboard">
 
 
-        {/* =========================
+        {/* ===================================================
             LEFT COLUMN
-        ========================== */}
+            =================================================== */}
+
         <div className="input-column">
 
 
-          {/* =========================
+          {/* =================================================
               TEXT → ISL
-          ========================== */}
+              ================================================= */}
+
           {activeTab === 'text' && (
 
             <section className="card">
 
               <div className="card-header-with-action">
 
-                <h2>Text to ISL</h2>
+                <h2>
+                  Text to ISL
+                </h2>
+
 
                 <button
                   type="button"
                   className="quick-mic-link"
                   id="switch-to-voice-btn"
-                  onClick={() => setActiveTab('speech')}
+                  onClick={() =>
+                    setActiveTab('speech')
+                  }
                   title="Switch to Voice Input"
                 >
                   Use Voice Input
@@ -184,7 +386,9 @@ function App() {
               </div>
 
 
-              <form onSubmit={handleTranslate}>
+              <form
+                onSubmit={handleTranslate}
+              >
 
                 <div className="form-group">
 
@@ -192,11 +396,14 @@ function App() {
                     Enter text to translate
                   </label>
 
+
                   <textarea
                     id="text-input"
                     value={inputText}
                     onChange={(e) =>
-                      setInputText(e.target.value)
+                      setInputText(
+                        e.target.value
+                      )
                     }
                     placeholder="e.g., Hello teacher, please learn"
                     rows={4}
@@ -212,13 +419,15 @@ function App() {
                     type="submit"
                     className="btn btn-primary"
                     disabled={
-                      loading || !inputText.trim()
+                      loading ||
+                      !inputText.trim()
                     }
                   >
 
                     {loading && (
                       <span className="loading" />
                     )}
+
 
                     {loading
                       ? 'Translating...'
@@ -233,7 +442,10 @@ function App() {
                       id="clear-text-btn"
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={() => setInputText('')}
+                      onClick={() => {
+                        setInputText('');
+                        setGeneratedVideoUrl(null);
+                      }}
                     >
                       Clear
                     </button>
@@ -245,17 +457,25 @@ function App() {
               </form>
 
 
-              {/* ERROR */}
+              {/* =============================================
+                  ERROR MESSAGE
+                  ============================================= */}
+
               {error && (
 
                 <div className="error-message">
 
-                  <span>{error}</span>
+                  <span>
+                    {error}
+                  </span>
+
 
                   <button
                     type="button"
                     className="error-dismiss-btn"
-                    onClick={() => setError(null)}
+                    onClick={() =>
+                      setError(null)
+                    }
                   >
                     x
                   </button>
@@ -265,12 +485,16 @@ function App() {
               )}
 
 
-              {/* QUICK PHRASES */}
+              {/* =============================================
+                  QUICK TEST PHRASES
+                  ============================================= */}
+
               <div className="sample-prompts">
 
                 <span className="sample-label">
                   Quick test phrases
                 </span>
+
 
                 <div className="sample-chips">
 
@@ -283,7 +507,9 @@ function App() {
                         type="button"
                         className="chip-btn"
                         onClick={() =>
-                          setInputText(phrase)
+                          setInputText(
+                            phrase
+                          )
                         }
                       >
                         {phrase}
@@ -301,16 +527,30 @@ function App() {
           )}
 
 
-          {/* =========================
+          {/* =================================================
               SPEECH → TEXT
-          ========================== */}
+              ================================================= */}
+
           {activeTab === 'speech' && (
 
             <section className="card speech-studio-card">
 
               <SpeechInput
-              onTranscriptionComplete={handleSpeechTranscriptionComplete}
-              onPopulateText={handlePopulateText}
+                onTranscriptionComplete={
+                  handleSpeechTranscriptionComplete
+                }
+
+                onPopulateText={
+                  handlePopulateText
+                }
+
+                onGenerateVideo={
+                  handleGenerateISLVideo
+                }
+
+                isGeneratingVideo={
+                  isGeneratingVideo
+                }
               />
 
             </section>
@@ -320,16 +560,25 @@ function App() {
         </div>
 
 
-        {/* =========================
+        {/* ===================================================
             RIGHT COLUMN
-        ========================== */}
+            =================================================== */}
+
         <div className="output-column">
 
           <section className="card output-card">
 
+
+            {/* =================================================
+                OUTPUT HEADER
+                ================================================= */}
+
             <div className="card-header-with-badge">
 
-              <h2>ISL Translation</h2>
+              <h2>
+                ISL Translation
+              </h2>
+
 
               {lastSource && (
 
@@ -346,19 +595,25 @@ function App() {
             </div>
 
 
-            {/* =========================
+            {/* =================================================
                 RESULT EXISTS
-            ========================== */}
+                ================================================= */}
+
             {result ? (
 
               <>
 
-                {/* ORIGINAL TEXT */}
+
+                {/* =============================================
+                    ORIGINAL TEXT
+                    ============================================= */}
+
                 <div className="form-group">
 
                   <label>
                     Original Text
                   </label>
+
 
                   <div className="text-display-box">
                     "{result.original_text}"
@@ -367,12 +622,16 @@ function App() {
                 </div>
 
 
-                {/* GLOSS SEQUENCE */}
+                {/* =============================================
+                    GLOSS SEQUENCE
+                    ============================================= */}
+
                 <div className="form-group">
 
                   <label>
                     Gloss Sequence
                   </label>
+
 
                   <div className="output-area gloss-area">
 
@@ -384,11 +643,14 @@ function App() {
                         {result.gloss_sequence.map(
                           (gloss, idx) => (
 
-                            <React.Fragment key={idx}>
+                            <React.Fragment
+                              key={idx}
+                            >
 
                               <span className="gloss-pill">
                                 {gloss}
                               </span>
+
 
                               {idx <
                                 result.gloss_sequence.length -
@@ -418,7 +680,10 @@ function App() {
                 </div>
 
 
-                {/* ACTIVE VIDEO */}
+                {/* =============================================
+                    ACTIVE ISL VIDEO
+                    ============================================= */}
+
                 {selectedVideo &&
                   selectedVideo.found &&
                   selectedVideo.video_path && (
@@ -432,11 +697,16 @@ function App() {
                       </strong>
                     </label>
 
+
                     <div className="video-player-wrapper">
 
                       <video
-                        key={selectedVideo.video_path}
-                        src={selectedVideo.video_path}
+                        key={
+                          selectedVideo.video_path
+                        }
+                        src={
+                          selectedVideo.video_path
+                        }
                         controls
                         autoPlay
                         className="active-isl-video"
@@ -445,11 +715,13 @@ function App() {
                         the video tag.
                       </video>
 
+
                       <div className="video-player-meta">
 
                         <span className="video-player-badge">
                           Sign: {selectedVideo.word}
                         </span>
+
 
                         <span className="video-player-path">
                           {selectedVideo.video_path}
@@ -464,7 +736,10 @@ function App() {
                 )}
 
 
-                {/* VIDEO LIST */}
+                {/* =============================================
+                    VIDEO LIST
+                    ============================================= */}
+
                 <div className="form-group">
 
                   <label>
@@ -474,6 +749,7 @@ function App() {
                       : 0}{' '}
                     signs)
                   </label>
+
 
                   <div className="video-list">
 
@@ -506,7 +782,11 @@ function App() {
                                 video.found &&
                                 video.video_path
                               ) {
-                                setSelectedVideo(video);
+
+                                setSelectedVideo(
+                                  video
+                                );
+
                               }
 
                             }}
@@ -517,14 +797,17 @@ function App() {
                               <div className="video-word">
 
                                 {video.found && (
+
                                   <span className="play-icon">
                                     ▶
                                   </span>
+
                                 )}
 
                                 {video.word}
 
                               </div>
+
 
                               <span
                                 className={`video-status ${
@@ -533,9 +816,11 @@ function App() {
                                     : 'not-found'
                                 }`}
                               >
+
                                 {video.found
                                   ? 'Available'
                                   : 'Missing'}
+
                               </span>
 
                             </div>
@@ -571,20 +856,77 @@ function App() {
 
             ) : (
 
-              /* =========================
+              /* ===============================================
                  NO RESULT
-              ========================== */
+                 =============================================== */
+
               <div className="output-area empty-placeholder">
 
                 <div className="placeholder-icon">
                   [ ISL ]
                 </div>
 
+
                 <p>
                   Translate text or speak into the
                   microphone to see ISL gloss sequences
                   and video matches.
                 </p>
+
+              </div>
+
+            )}
+
+
+            {/* =================================================
+                KIE.AI GENERATED VIDEO
+                =================================================
+
+                IMPORTANT:
+                This is OUTSIDE the {result ? ... : ...}
+                condition.
+
+                Therefore the Kie.ai video can appear even
+                when there is no dictionary translation result.
+                ================================================= */}
+
+            {generatedVideoUrl && (
+
+              <div className="generated-video-section">
+
+                <div className="generated-video-header">
+
+                  <span className="generated-video-icon">
+                    ✨
+                  </span>
+
+
+                  <div>
+
+                    <h3>
+                      Generated ISL Video
+                    </h3>
+
+
+                    <p>
+                      AI-generated sign language demonstration
+                    </p>
+
+                  </div>
+
+                </div>
+
+
+                <video
+                  key={generatedVideoUrl}
+                  className="generated-isl-video"
+                  controls
+                  autoPlay
+                  playsInline
+                  src={generatedVideoUrl}
+                >
+                  Your browser does not support video playback.
+                </video>
 
               </div>
 
@@ -597,33 +939,48 @@ function App() {
       </div>
 
 
-      {/* =========================
-          MODULES
-      ========================== */}
+      {/* =====================================================
+          SYSTEM MODULES
+          ===================================================== */}
+
       <section className="card modules-section">
 
-        <h2>EduSign System Modules</h2>
+        <h2>
+          EduSign System Modules
+        </h2>
+
 
         <div className="modules">
 
 
+          {/* =================================================
+              TEXT TO ISL MODULE
+              ================================================= */}
+
           <div
             className="module-card active"
             id="module-text"
-            onClick={() => setActiveTab('text')}
+            onClick={() =>
+              setActiveTab('text')
+            }
           >
 
             <span className="module-icon-text">
               T
             </span>
 
-            <h3>Text to ISL</h3>
+
+            <h3>
+              Text to ISL
+            </h3>
+
 
             <p>
               Convert text to sign language
               gloss &amp; videos
             </p>
 
+
             <span className="module-badge active-badge">
               Active
             </span>
@@ -631,22 +988,33 @@ function App() {
           </div>
 
 
+          {/* =================================================
+              SPEECH TO TEXT MODULE
+              ================================================= */}
+
           <div
             className="module-card active"
             id="module-speech"
-            onClick={() => setActiveTab('speech')}
+            onClick={() =>
+              setActiveTab('speech')
+            }
           >
 
             <span className="module-icon-text">
               S
             </span>
 
-            <h3>Speech to Text</h3>
+
+            <h3>
+              Speech to Text
+            </h3>
+
 
             <p>
               Voice dictation with OpenAI
               Whisper AI
             </p>
+
 
             <span className="module-badge active-badge">
               Active
@@ -654,6 +1022,10 @@ function App() {
 
           </div>
 
+
+          {/* =================================================
+              LIVE CLASSROOM MODULE
+              ================================================= */}
 
           <div
             className="module-card"
@@ -664,12 +1036,17 @@ function App() {
               L
             </span>
 
-            <h3>Live Classroom</h3>
+
+            <h3>
+              Live Classroom
+            </h3>
+
 
             <p>
               Real-time lecture audio streaming
               &amp; translation
             </p>
+
 
             <span className="module-badge coming-badge">
               Phase 2
@@ -677,6 +1054,10 @@ function App() {
 
           </div>
 
+
+          {/* =================================================
+              GESTURE TO TEXT MODULE
+              ================================================= */}
 
           <div
             className="module-card"
@@ -687,12 +1068,17 @@ function App() {
               G
             </span>
 
-            <h3>Gesture to Text</h3>
+
+            <h3>
+              Gesture to Text
+            </h3>
+
 
             <p>
               Webcam-based sign language
               recognition
             </p>
+
 
             <span className="module-badge coming-badge">
               Phase 2
@@ -700,6 +1086,10 @@ function App() {
 
           </div>
 
+
+          {/* =================================================
+              AAC MODULE
+              ================================================= */}
 
           <div
             className="module-card"
@@ -710,12 +1100,17 @@ function App() {
               A
             </span>
 
-            <h3>AAC Communication</h3>
+
+            <h3>
+              AAC Communication
+            </h3>
+
 
             <p>
               Augmentative visual
               communication board
             </p>
+
 
             <span className="module-badge coming-badge">
               Phase 2
@@ -723,6 +1118,10 @@ function App() {
 
           </div>
 
+
+          {/* =================================================
+              YOUTUBE MODULE
+              ================================================= */}
 
           <div
             className="module-card"
@@ -733,18 +1132,24 @@ function App() {
               Y
             </span>
 
-            <h3>YouTube Learning</h3>
+
+            <h3>
+              YouTube Learning
+            </h3>
+
 
             <p>
               Educational video subtitle
               translation
             </p>
 
+
             <span className="module-badge coming-badge">
               Phase 3
             </span>
 
           </div>
+
 
         </div>
 

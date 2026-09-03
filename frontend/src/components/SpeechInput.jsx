@@ -5,6 +5,8 @@ const API_URL = "http://127.0.0.1:8000";
 function SpeechInput({
   onTranscriptionComplete,
   onPopulateText,
+  onGenerateVideo,
+  isGeneratingVideo,
 }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -397,33 +399,32 @@ function SpeechInput({
       )}
 
 
-      {/* Transcription */}
       <div className="transcript-box">
+    <h3>Transcribed Text</h3>
 
-        <h3>
-          Transcribed Text
-        </h3>
+    <div className="transcript-content">
+    {transcript ? (
+      <p>{transcript}</p>
+    ) : (
+      <p className="transcript-placeholder">
+        Your speech will appear here after you stop recording...
+      </p>
+    )}
+  </div>
 
-        <div className="transcript-content">
-
-          {transcript ? (
-
-            <p>
-              {transcript}
-            </p>
-
-          ) : (
-
-            <p className="transcript-placeholder">
-              Your speech will appear here
-              after you stop recording...
-            </p>
-
-          )}
-
-        </div>
-
-      </div>
+  {transcript && (
+    <button
+      type="button"
+      className="generate-isl-button"
+      onClick={() => onGenerateVideo(transcript)}
+      disabled={isGeneratingVideo}
+    >
+      {isGeneratingVideo
+        ? '⏳ Generating ISL Video...'
+        : ' Generate ISL Video'}
+    </button>
+  )}
+</div>
 
 
       {/* Information */}
